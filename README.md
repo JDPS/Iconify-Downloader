@@ -42,7 +42,7 @@ source .venv/bin/activate
 ### 3. Install dependencies
 
 ```bash
-pip install click httpx tqdm
+pip install click "httpx[http2]" tqdm
 ```
 
 ## 🚀 Usage
@@ -52,7 +52,7 @@ pip install click httpx tqdm
 Download all icons from a collection:
 
 ```bash
-python iconify_dl_plus.py fluent -o ./icons
+python iconify_dl_plus.py lucide-lab -o ./icons
 ```
 
 If `/collection` isn’t flat, the script automatically falls back to GitHub JSON and downloads from there.

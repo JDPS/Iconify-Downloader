@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
-# iconify_dl_plus.py — conservative variant that preserves original behavior and adds:
+# iconify_dl_plus.py — conservative variant that preserves original behaviour and adds:
 #   --json <file>      (offline/pinned listing from local JSON)
-#   --no-prefix        (rename files after download to name.svg)
-#   --by-category      (move files into per-category folders; works when JSON has categories)
-#   --zip <file.zip>   (zip output directory after download)
+#   --no-prefix        (rename files after a download to name.svg)
+#   --by-category      (move files into per-category folders;
+#                       works when JSON has categories)
+#   --zip <file.zip>   (zip output directory after a download)
 #   --dry-run          (list actions; skip downloads)
 #
 # Design notes:
-# - We DO NOT change list_from_api/list_from_github signatures or fetch_svg signature.
-# - We add post-processing steps (rename/move/zip) to avoid touching download code paths.
+# - DO NOT change list_from_api/list_from_github signatures or fetch_svg signature.
+# - Add post-processing steps (rename/move/zip) to avoid touching download code paths.
 # - Style: built-in generics (list[str], dict), annotations enabled via __future__.
 
 from __future__ import annotations
@@ -50,8 +51,8 @@ def infer_prefix(s: str) -> str:
                 cand = parts[-1].lower().removesuffix('.json')
                 if STRICT_PREFIX_RE.match(cand):
                     return cand
-    except Exception:
-        pass
+    except Exception as exc:
+        print(exc, file=sys.stderr)
     if STRICT_PREFIX_RE.match(s):
         return s.lower()
     raise click.ClickException(
@@ -60,7 +61,9 @@ def infer_prefix(s: str) -> str:
     )
 
 
-def list_from_api(client: httpx.Client, prefix: str, debug: bool) -> tuple[list[str], dict]:
+def list_from_api(client: httpx.Client,
+                  prefix: str,
+                  debug: bool) -> tuple[list[str], dict]:
     # 1) Check set exists
     r = client.get(f"{ICONIFY_API}/collections", params={"prefix": prefix}, timeout=30)
     r.raise_for_status()
@@ -70,20 +73,26 @@ def list_from_api(client: httpx.Client, prefix: str, debug: bool) -> tuple[list[
             click.echo(f"[debug] /collections did not contain '{prefix}'", err=True)
         raise click.ClickException(f"Iconify API: unknown prefix '{prefix}'")
     # 2) List icons
-    r = client.get(f"{ICONIFY_API}/collection", params={"prefix": prefix, "info": "true"}, timeout=60)
+    r = client.get(f"{ICONIFY_API}/collection",
+                   params={"prefix": prefix,"info": "true"},
+                   timeout=60)
     r.raise_for_status()
     col = r.json()
     icons = col.get("icons")
     if not isinstance(icons, list):
         if debug:
             keys = list(col.keys())
-            click.echo(f"[debug] /collection icons not list (type={type(icons).__name__}), keys={keys}", err=True)
+            click.echo(f"[debug] /collection icons"
+                       f" not list "
+                       f"(type={type(icons).__name__}),"
+                       f" keys={keys}", err=True)
         raise click.ClickException("icons is not a list")
     info = col.get("info") or {}
     return [str(x) for x in icons], (info if isinstance(info, dict) else {})
 
-
-def list_from_github(client: httpx.Client, prefix: str, debug: bool) -> tuple[list[str], dict, dict]:
+def list_from_github(client: httpx.Client,
+                     prefix: str,
+                     debug: bool) -> tuple[list[str], dict, dict]:
     url = f"{GITHUB_RAW}/{prefix}.json"
     r = client.get(url, timeout=60)
     r.raise_for_status()
@@ -91,14 +100,20 @@ def list_from_github(client: httpx.Client, prefix: str, debug: bool) -> tuple[li
     icons_obj = data.get("icons")
     if not isinstance(icons_obj, dict):
         if debug:
-            click.echo(f"[debug] GitHub JSON 'icons' is {type(icons_obj)}; top keys: {list(data.keys())}", err=True)
+            click.echo(f"[debug] GitHub JSON"
+                       f" 'icons' is {type(icons_obj)};"
+                       f" top keys: {list(data.keys())}", err=True)
         raise click.ClickException(f"Unexpected JSON structure for '{prefix}'.")
     info = data.get("info") if isinstance(data.get("info"), dict) else {}
-    categories = data.get("categories") if isinstance(data.get("categories"), dict) else {}
+    categories =\
+        data.get("categories") if isinstance(data.get("categories"), dict) else {}
     return sorted(icons_obj.keys()), info, categories
 
 
-def filter_icons(names: Iterable[str], include: set[str] | None, exclude: set[str] | None, contains: str | None) -> list[str]:
+def filter_icons(names: Iterable[str],
+                 include: set[str] | None,
+                 exclude: set[str] | None,
+                 contains: str | None) -> list[str]:
     out: list[str] = []
     for n in names:
         if include and n not in include:
@@ -121,13 +136,18 @@ def write_license(out_dir: Path, prefix: str, info: dict) -> None:
                 f"Iconify set: {prefix}\n"
                 f"License: {lic_name or 'N/A'}\n"
                 f"Reference: {lic_ref or 'N/A'}\n"
-                f"Note: Some sets need attribution. Check upstream license before redistribution.\n"
+                f"Note: Some sets need attribution."
+                f" Check upstream license before redistribution.\n"
             ),
             encoding="utf-8",
         )
 
 
-def fetch_svg(client: httpx.Client, prefix: str, name: str, out_dir: Path, size: int | None) -> tuple[str, bool, str]:
+def fetch_svg(client: httpx.Client,
+              prefix: str,
+              name: str,
+              out_dir: Path,
+              size: int | None) -> tuple[str, bool, str]:
     params = {"height": str(size)} if size else None
     url = f"{ICONIFY_API}/{prefix}:{name}.svg"
     try:
@@ -136,7 +156,7 @@ def fetch_svg(client: httpx.Client, prefix: str, name: str, out_dir: Path, size:
         (out_dir / f"{prefix}-{name}.svg").write_bytes(r.content)
         return name, True, ""
     except Exception as exc:
-        return (name, False, str(exc))
+        return name, False, str(exc)
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -158,12 +178,23 @@ def fetch_svg(client: httpx.Client, prefix: str, name: str, out_dir: Path, size:
 @click.option("--debug/--no-debug", default=False, show_default=True,
               help="Verbose diagnostics.")
 # New options (non-breaking to core flow)
-@click.option("--json", "json_path", type=click.Path(path_type=Path), default=None,
+@click.option("--json",
+              "json_path",
+              type=click.Path(path_type=Path),
+              default=None,
               help="Use a local Iconify JSON file instead of API/GitHub listing.")
-@click.option("--no-prefix", is_flag=True, help="Rename files to 'name.svg' after download.")
-@click.option("--by-category", is_flag=True, help="Move files into category subfolders when available.")
-@click.option("--zip", "zip_name", default=None, help="Zip output directory to this file when done.")
-@click.option("--dry-run", is_flag=True, help="List actions without downloading files.")
+@click.option("--no-prefix",
+              is_flag=True,
+              help="Rename files to 'name.svg' after download.")
+@click.option("--by-category",
+              is_flag=True,
+              help="Move files into category subfolders when available.")
+@click.option("--zip", "zip_name",
+              default=None,
+              help="Zip output directory to this file when done.")
+@click.option("--dry-run",
+              is_flag=True,
+              help="List actions without downloading files.")
 def cli(prefix_or_url, out_dir: Path,
         include, exclude, contains, jobs, size, overwrite, debug,
         json_path, no_prefix, by_category, zip_name, dry_run):
@@ -201,21 +232,27 @@ def cli(prefix_or_url, out_dir: Path,
             try:
                 icon_names, info = list_from_api(client, prefix, debug)
                 if debug:
-                    click.echo(f"[debug] API returned {len(icon_names)} icons for '{prefix}'", err=True)
+                    click.echo(f"[debug] API returned {len(icon_names)} "
+                               f"icons for '{prefix}'", err=True)
             except Exception as exc:
                 if debug:
-                    click.echo(f"[debug] /collection failed for '{prefix}': {exc}", err=True)
-                    click.echo(f"[debug] Falling back to GitHub JSON for '{prefix}'", err=True)
+                    click.echo(f"[debug] /collection"
+                               f" failed for '{prefix}': {exc}", err=True)
+                    click.echo(f"[debug] Falling back to"
+                               f" GitHub JSON for '{prefix}'", err=True)
                 icon_names, info, categories = list_from_github(client, prefix, debug)
                 if debug:
-                    click.echo(f"[debug] GitHub returned {len(icon_names)} icons for '{prefix}'", err=True)
+                    click.echo(f"[debug] GitHub returned"
+                               f" {len(icon_names)} icons for '{prefix}'", err=True)
 
     if not icon_names:
-        raise click.ClickException(f"No icons found for prefix '{prefix}' (API/GitHub/local JSON empty).")
+        raise click.ClickException(f"No icons found for prefix"
+                                   f" '{prefix}' (API/GitHub/local JSON empty).")
 
     names = filter_icons(icon_names, include_set, exclude_set, contains_str)
     if not names:
-        raise click.ClickException("Filters removed all icons. Try adjusting --include/--exclude/--contains.")
+        raise click.ClickException("Filters removed all icons."
+                                   " Try adjusting --include/--exclude/--contains.")
 
     write_license(out_dir, prefix, info)
 
@@ -230,7 +267,8 @@ def cli(prefix_or_url, out_dir: Path,
             to_fetch.append(n)
 
     if debug:
-        click.echo(f"[debug] {len(to_fetch)} to download, {existing} already present", err=True)
+        click.echo(f"[debug] {len(to_fetch)} to download"
+                   f", {existing} already present", err=True)
 
     # Dry-run: just show what would be downloaded/moved
     if dry_run:
@@ -248,7 +286,11 @@ def cli(prefix_or_url, out_dir: Path,
     failures = 0
     errors: list[tuple[str, str]] = []
     with httpx.Client(http2=True, timeout=60) as client:
-        with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool, tqdm(total=len(to_fetch), unit="icon", desc=f"Downloading {prefix}") as pbar:
+        with ThreadPoolExecutor(max_workers=max(1, jobs)) as pool, tqdm(
+                total=len(to_fetch),
+                unit="icon",
+                desc=f"Downloading {prefix}"
+        ) as pbar:
             futures = []
             for n in to_fetch:
                 futures.append(pool.submit(fetch_svg, client, prefix, n, out_dir, size))
@@ -283,7 +325,7 @@ def cli(prefix_or_url, out_dir: Path,
             # target dir
             target_dir = out_dir
             if by_category and categories:
-                # Build reverse map once
+                # Build the reverse map once
                 # categories: { "category": [ "name", ... ] }
                 # We'll scan memberships lazily
                 cat_name = None
@@ -303,9 +345,11 @@ def cli(prefix_or_url, out_dir: Path,
                     moved += 1
                 except Exception as exc:
                     if debug:
-                        click.echo(f"[debug] move failed for {src} -> {dst}: {exc}", err=True)
+                        click.echo(f"[debug] move failed"
+                                   f" for {src} -> {dst}: {exc}", err=True)
         if debug:
-            click.echo(f"[debug] Post-process moved/renamed {moved} files", err=True)
+            click.echo(f"[debug] Post-process"
+                       f" moved/renamed {moved} files", err=True)
 
     # Zip
     if zip_name:

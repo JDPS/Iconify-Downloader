@@ -15,7 +15,7 @@ It supports online and offline modes, JSON-based listing, category grouping, zip
 - 🪣 Zip results after download (`--zip <file.zip>`)
 - 🧪 Dry-run mode (`--dry-run`) to preview without downloading
 - 🧵 Multithreaded downloads (fast and reliable)
-- 🪶 Pure-Python, single-file tool — no external dependencies beyond `click`, `httpx`, and `tqdm`
+- 🪶 External dependencies `click`, `httpx`, and `tqdm`
 
 ---
 

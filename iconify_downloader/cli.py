@@ -1,162 +1,17 @@
-#!/usr/bin/env python3
-# iconify_dl_plus.py — conservative variant that preserves original behaviour and adds:
-#   --json <file>      (offline/pinned listing from local JSON)
-#   --no-prefix        (rename files after a download to name.svg)
-#   --by-category      (move files into per-category folders;
-#                       works when JSON has categories)
-#   --zip <file.zip>   (zip output directory after a download)
-#   --dry-run          (list actions; skip downloads)
-#
-# Design notes:
-# - DO NOT change list_from_api/list_from_github signatures or fetch_svg signature.
-# - Add post-processing steps (rename/move/zip) to avoid touching download code paths.
-# - Style: built-in generics (list[str], dict), annotations enabled via __future__.
-
 from __future__ import annotations
 
 import json
-import re
 import shutil
 import sys
-from collections.abc import Iterable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
-from urllib.parse import urlparse
 
 import click
 import httpx
 from tqdm import tqdm
 
-ICONIFY_API = "https://api.iconify.design"
-GITHUB_RAW = "https://raw.githubusercontent.com/iconify/icon-sets/master/json"
-
-URL_PREFIX_RE = re.compile(
-    r"(?:iconify\.design/(?:icon-sets|icons)/|icon-sets\.iconify\.design/)"
-    r"([a-z0-9][a-z0-9\-]*)/?",
-    re.I,
-)
-STRICT_PREFIX_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$", re.I)
-
-
-def infer_prefix(s: str) -> str:
-    s = s.strip()
-    m = URL_PREFIX_RE.search(s)
-    if m:
-        return m.group(1).lower()
-    try:
-        p = urlparse(s)
-        if p.scheme and p.netloc:
-            parts = [x for x in p.path.split('/') if x]
-            if parts:
-                cand = parts[-1].lower().removesuffix('.json')
-                if STRICT_PREFIX_RE.match(cand):
-                    return cand
-    except Exception as exc:
-        print(exc, file=sys.stderr)
-    if STRICT_PREFIX_RE.match(s):
-        return s.lower()
-    raise click.ClickException(
-        f"Cannot infer icon-set prefix from '{s}'. "
-        "Use a prefix like 'fluent' or a set URL such as 'https://icon-sets.iconify.design/fluent/'."
-    )
-
-
-def list_from_api(client: httpx.Client,
-                  prefix: str,
-                  debug: bool) -> tuple[list[str], dict]:
-    # 1) Check set exists
-    r = client.get(f"{ICONIFY_API}/collections", params={"prefix": prefix}, timeout=30)
-    r.raise_for_status()
-    data = r.json()
-    if not isinstance(data, dict) or prefix not in data:
-        if debug:
-            click.echo(f"[debug] /collections did not contain '{prefix}'", err=True)
-        raise click.ClickException(f"Iconify API: unknown prefix '{prefix}'")
-    # 2) List icons
-    r = client.get(f"{ICONIFY_API}/collection",
-                   params={"prefix": prefix,"info": "true"},
-                   timeout=60)
-    r.raise_for_status()
-    col = r.json()
-    icons = col.get("icons")
-    if not isinstance(icons, list):
-        if debug:
-            keys = list(col.keys())
-            click.echo(f"[debug] /collection icons"
-                       f" not list "
-                       f"(type={type(icons).__name__}),"
-                       f" keys={keys}", err=True)
-        raise click.ClickException("icons is not a list")
-    info = col.get("info") or {}
-    return [str(x) for x in icons], (info if isinstance(info, dict) else {})
-
-def list_from_github(client: httpx.Client,
-                     prefix: str,
-                     debug: bool) -> tuple[list[str], dict, dict]:
-    url = f"{GITHUB_RAW}/{prefix}.json"
-    r = client.get(url, timeout=60)
-    r.raise_for_status()
-    data = r.json()
-    icons_obj = data.get("icons")
-    if not isinstance(icons_obj, dict):
-        if debug:
-            click.echo(f"[debug] GitHub JSON"
-                       f" 'icons' is {type(icons_obj)};"
-                       f" top keys: {list(data.keys())}", err=True)
-        raise click.ClickException(f"Unexpected JSON structure for '{prefix}'.")
-    info = data.get("info") if isinstance(data.get("info"), dict) else {}
-    categories =\
-        data.get("categories") if isinstance(data.get("categories"), dict) else {}
-    return sorted(icons_obj.keys()), info, categories
-
-
-def filter_icons(names: Iterable[str],
-                 include: set[str] | None,
-                 exclude: set[str] | None,
-                 contains: str | None) -> list[str]:
-    out: list[str] = []
-    for n in names:
-        if include and n not in include:
-            continue
-        if exclude and n in exclude:
-            continue
-        if contains and contains.lower() not in n.lower():
-            continue
-        out.append(n)
-    return out
-
-
-def write_license(out_dir: Path, prefix: str, info: dict) -> None:
-    lic = (info.get("license") or {}) if isinstance(info, dict) else {}
-    lic_name = lic.get("title") or lic.get("name")
-    lic_ref = lic.get("spdx") or lic.get("url")
-    if lic_name or lic_ref:
-        (out_dir / "LICENSE.txt").write_text(
-            (
-                f"Iconify set: {prefix}\n"
-                f"License: {lic_name or 'N/A'}\n"
-                f"Reference: {lic_ref or 'N/A'}\n"
-                f"Note: Some sets need attribution."
-                f" Check upstream license before redistribution.\n"
-            ),
-            encoding="utf-8",
-        )
-
-
-def fetch_svg(client: httpx.Client,
-              prefix: str,
-              name: str,
-              out_dir: Path,
-              size: int | None) -> tuple[str, bool, str]:
-    params = {"height": str(size)} if size else None
-    url = f"{ICONIFY_API}/{prefix}:{name}.svg"
-    try:
-        r = client.get(url, params=params, timeout=40)
-        r.raise_for_status()
-        (out_dir / f"{prefix}-{name}.svg").write_bytes(r.content)
-        return name, True, ""
-    except Exception as exc:
-        return name, False, str(exc)
+from .core import fetch_svg, list_from_api, list_from_github
+from .utils import filter_icons, infer_prefix, write_license
 
 
 @click.command(context_settings={"help_option_names": ["-h", "--help"]})
@@ -357,17 +212,3 @@ def cli(prefix_or_url, out_dir: Path,
         archive_base = base.with_suffix("")
         shutil.make_archive(str(archive_base), "zip", out_dir)
         click.echo(f"Zipped to {archive_base}.zip")
-
-
-if __name__ == "__main__":
-    try:
-        cli()
-    except httpx.HTTPError as e:
-        click.echo(f"HTTP error: {e}", err=True)
-        sys.exit(2)
-    except click.ClickException as e:
-        click.echo(str(e), err=True)
-        sys.exit(2)
-    except Exception as e:
-        click.echo(f"Error: {e}", err=True)
-        sys.exit(1)

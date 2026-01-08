@@ -1,0 +1,4 @@
+Iconify set: fluent
+License: MIT
+Reference: MIT
+Note: Some sets need attribution. Check upstream license before redistribution.

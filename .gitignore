@@ -1,5 +1,5 @@
 /.venv/
 /.idea/
 /downloads/
-/.dev/
 /.dev_tools/
+/uv.lock

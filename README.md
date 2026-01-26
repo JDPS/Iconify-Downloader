@@ -22,42 +22,51 @@ It supports online and offline modes, JSON-based listing, category grouping, zip
 ## 🧰 Installation
 
 ### 1. Clone or copy the script
+
 ```bash
 git clone https://github.com/JDPS/Iconify-Downloader.git
 cd iconify-downloader
 ```
 
-or simply download ***iconify_dl_plus*** into a directory.
+### 2. Install the package
 
-### 2. Create and activate a virtual environment
+Using **uv** (recommended):
 
 ```bash
-python -m venv .venv
-# Windows PowerShell
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
+uv sync
 ```
 
-### 3. Install dependencies
+Or using **pip**:
 
 ```bash
-pip install click "httpx[http2]" tqdm
+pip install .
 ```
 
 ## 🚀 Usage
 
 ### Basic example
 
-Download all icons from a collection:
+Download all icons from a collection using the installed CLI:
 
 ```bash
-python iconify_dl_plus.py lucide-lab -o ./icons
+iconify-dl lucide-lab -o ./icons
+```
+
+Or using `python -m`:
+
+```bash
+python -m iconify_downloader lucide-lab -o ./icons
+```
+
+Or using `uv run`:
+
+```bash
+uv run iconify-dl lucide-lab -o ./icons
 ```
 
 If `/collection` isn’t flat, the script automatically falls back to GitHub JSON and downloads from there.
 
-------
+---
 
 ### Offline / pinned listing
 
@@ -70,63 +79,63 @@ curl -LO https://raw.githubusercontent.com/iconify/icon-sets/master/json/fluent.
 Then run without network dependency:
 
 ```bash
-python iconify_dl_plus.py fluent -o ./icons --json fluent.json
+iconify-dl fluent -o ./icons --json fluent.json
 ```
 
-------
+---
 
 ### Rename files (no prefix)
 
 ```bash
-python iconify_dl_plus.py mdi -o ./mdi --contains arrow --no-prefix
+iconify-dl mdi -o ./mdi --contains arrow --no-prefix
 ```
 
-------
+---
 
 ### Group by category
 
 ```bash
-python iconify_dl_plus.py tabler -o ./tabler --by-category
+iconify-dl tabler -o ./tabler --by-category
 ```
 
-------
+---
 
 ### Dry run (no downloads)
 
 ```bash
-python iconify_dl_plus.py https://icon-sets.iconify.design/lucide-lab/ -o ./icons --dry-run
+iconify-dl https://icon-sets.iconify.design/lucide-lab/ -o ./icons --dry-run
 ```
 
-------
+---
 
 ### Zip results after download
 
 ```bash
-python iconify_dl_plus.py fluent -o ./icons --zip fluent_icons.zip
+iconify-dl fluent -o ./icons --zip fluent_icons.zip
 ```
 
-------
+---
 
 ## 🧩 Options Reference
 
-| Option                       | Description                                                  |
-| ---------------------------- | ------------------------------------------------------------ |
+| Option                       | Description                                                      |
+| ---------------------------- | ---------------------------------------------------------------- |
 | `PREFIX_OR_URL`              | Iconify prefix (`fluent`, `mdi`, `tabler`, etc.) or full set URL |
-| `-o, --out`                  | Output directory (default: `./iconify_svgs`)                 |
-| `--include`                  | Comma-separated list of icons to include                     |
-| `--exclude`                  | Comma-separated list of icons to exclude                     |
-| `--contains`                 | Substring filter for icon names                              |
-| `-j, --jobs`                 | Number of concurrent downloads (default: 12)                 |
-| `--size`                     | Icon height (in pixels)                                      |
-| `--overwrite/--no-overwrite` | Overwrite existing files (default: `False`)                  |
-| `--debug`                    | Show detailed logs                                           |
-| `--json`                     | Use a local Iconify JSON instead of API/GitHub               |
-| `--no-prefix`                | Save icons as `name.svg` instead of `prefix-name.svg`        |
-| `--by-category`              | Organize icons into folders by category (when available)     |
-| `--zip`                      | Zip output directory to this file                            |
-| `--dry-run`                  | Show planned actions without downloading                     |
+| `-o, --out`                  | Output directory (default: `./iconify_svgs`)                     |
+| `--include`                  | Comma-separated list of icons to include                         |
+| `--exclude`                  | Comma-separated list of icons to exclude                         |
+| `--contains`                 | Substring filter for icon names                                  |
+| `-j, --jobs`                 | Number of concurrent downloads (default: 12)                     |
+| `--size`                     | Icon height (in pixels)                                          |
+| `--overwrite/--no-overwrite` | Overwrite existing files (default: `False`)                      |
+| `--debug`                    | Show detailed logs                                               |
+| `--json`                     | Use a local Iconify JSON instead of API/GitHub                   |
+| `--no-prefix`                | Save icons as `name.svg` instead of `prefix-name.svg`            |
+| `--by-category`              | Organize icons into folders by category (when available)         |
+| `--zip`                      | Zip output directory to this file                                |
+| `--dry-run`                  | Show planned actions without downloading                         |
 
-------
+---
 
 ## 🧾 Example Output
 
@@ -144,15 +153,13 @@ Zipped to fluent_icons.zip
 - Safe retries: if the API returns a structured collection instead of a flat list, the script automatically falls back to GitHub JSON.
 - When `--dry-run` is active, **no network writes or file saves** occur.
 
-
-
 ## 🪪 License
 
 This script itself is released under the **MIT License**.
  Downloaded icon sets remain under their respective **Iconify / upstream licenses**.
  Always verify licensing terms in the generated `LICENSE.txt` file before redistribution.
 
-------
+---
 
 ## 💡 Credits
 

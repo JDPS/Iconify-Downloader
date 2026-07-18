@@ -5,13 +5,13 @@ build-backend = "hatchling.build"
 [project]
 name = "icons-downloader"
 version = "0.1.0"
-description = "Add your description here"
+description = "A simple command-line tool to download icons from Iconify."
 requires-python = ">=3.11"
 dependencies = [
-    "click==8.3.3",
-    "httpx[http2]==0.28.1",
-    "pytest==9.0.3",
-    "tqdm==4.67.3",
+    "click>=8.3.3",
+    "httpx[http2]>=0.28.1",
+    "pytest>=9.0.3",
+    "tqdm>=4.67.3",
 ]
 
 [project.scripts]
